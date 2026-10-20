@@ -1,0 +1,16 @@
+[project]
+name = "eurosys-blox"
+version = "0.1.0"
+description = "Blox: A Modular Toolkit for Deep Learning Schedulers"
+readme = "Readme.md"
+requires-python = ">=3.11,<3.12"
+dependencies = [
+    "grpcio==1.59.0",
+    "matplotlib==3.7.3",
+    "numpy==1.24.4",
+    "pandas==1.5.3",
+    "protobuf==3.20.3",
+]
+
+[tool.uv]
+package = false
