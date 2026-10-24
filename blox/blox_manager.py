@@ -19,6 +19,7 @@ from typing import Tuple, List
 sys.path.append(os.path.dirname(__file__))
 import deployment.grpc_server_rm as rm_serve
 import deployment.grpc_client_rm as rm_client
+from blox.utils import get_experiment_filepath
 
 # from cluster_state import ClusterState
 # from job_state import JobState
@@ -241,36 +242,57 @@ class BloxManager(object):
         # )
 
         if all(jid in job_state.finished_job for jid in job_state.job_ids_to_track):
-            with open(
-                f"{self.exp_prefix}_{job_state.job_ids_to_track[0]}_{job_state.job_ids_to_track[-1]}_{self.scheduler_name}_{self.acceptance_policy}_load_{self.load}_job_stats.json",
-                "w",
-            ) as fopen:
-                # fopen.write(json.dumps(self.job_completion_stats))
+            job_stats_path = get_experiment_filepath(
+                self.exp_prefix,
+                job_state.job_ids_to_track[0],
+                job_state.job_ids_to_track[-1],
+                self.scheduler_name,
+                self.load,
+                "job_stats",
+                acceptance_policy=self.acceptance_policy,
+            )
+            os.makedirs(os.path.dirname(job_stats_path), exist_ok=True)
+            with open(job_stats_path, "w") as fopen:
                 avg_jct = self._get_avg_jct(job_state.job_completion_stats)
                 print(
                     f"Scheduler: {self.scheduler_name}, Acceptance Policy: {self.acceptance_policy}, Load: {self.load}, Avg JCT {avg_jct}"
                 )
                 json.dump(job_state.job_completion_stats, fopen)
 
-            with open(
-                f"{self.exp_prefix}_{job_state.job_ids_to_track[0]}_{job_state.job_ids_to_track[-1]}_{self.scheduler_name}_{self.acceptance_policy}_load_{self.load}_cluster_stats.json",
-                "w",
-            ) as fopen:
-                # fopen.write(json.dumps(self.cluster_stats))
+            cluster_stats_path = get_experiment_filepath(
+                self.exp_prefix,
+                job_state.job_ids_to_track[0],
+                job_state.job_ids_to_track[-1],
+                self.scheduler_name,
+                self.load,
+                "cluster_stats",
+                acceptance_policy=self.acceptance_policy,
+            )
+            with open(cluster_stats_path, "w") as fopen:
                 json.dump(cluster_state.cluster_stats, fopen)
-            # sys.exit(0)
-            with open(
-                f"{self.exp_prefix}_{job_state.job_ids_to_track[0]}_{job_state.job_ids_to_track[-1]}_{self.scheduler_name}_{self.acceptance_policy}_load_{self.load}_run_time_stats.json",
-                "w",
-            ) as fopen:
-                # fopen.write(json.dumps(self.cluster_stats))
+
+            runtime_stats_path = get_experiment_filepath(
+                self.exp_prefix,
+                job_state.job_ids_to_track[0],
+                job_state.job_ids_to_track[-1],
+                self.scheduler_name,
+                self.load,
+                "run_time_stats",
+                acceptance_policy=self.acceptance_policy,
+            )
+            with open(runtime_stats_path, "w") as fopen:
                 json.dump(job_state.job_runtime_stats, fopen)
 
-            with open(
-                f"{self.exp_prefix}_{job_state.job_ids_to_track[0]}_{job_state.job_ids_to_track[-1]}_{self.scheduler_name}_{self.acceptance_policy}_load_{self.load}_responsivness.json",
-                "w",
-            ) as fopen:
-                # fopen.write(json.dumps(self.cluster_stats))
+            responsiveness_path = get_experiment_filepath(
+                self.exp_prefix,
+                job_state.job_ids_to_track[0],
+                job_state.job_ids_to_track[-1],
+                self.scheduler_name,
+                self.load,
+                "responsivness",
+                acceptance_policy=self.acceptance_policy,
+            )
+            with open(responsiveness_path, "w") as fopen:
                 avg_responsiveness = self._get_avg_jct(
                     job_state.job_responsiveness_stats
                 )
@@ -278,11 +300,17 @@ class BloxManager(object):
                     f"Scheduler: {self.scheduler_name}, Acceptance Policy: {self.acceptance_policy}, Load: {self.load}, Avg responsiveness {avg_responsiveness}"
                 )
                 json.dump(job_state.job_responsiveness_stats, fopen)
-            with open(
-                f"{self.exp_prefix}_{job_state.job_ids_to_track[0]}_{job_state.job_ids_to_track[-1]}_{self.scheduler_name}_{self.acceptance_policy}_load_{self.load}_custom_metrics.json",
-                "w",
-            ) as fopen:
-                # fopen.write(json.dumps(self.cluster_stats))
+
+            custom_metrics_path = get_experiment_filepath(
+                self.exp_prefix,
+                job_state.job_ids_to_track[0],
+                job_state.job_ids_to_track[-1],
+                self.scheduler_name,
+                self.load,
+                "custom_metrics",
+                acceptance_policy=self.acceptance_policy,
+            )
+            with open(custom_metrics_path, "w") as fopen:
                 json.dump(job_state.custom_metrics, fopen)
 
             self.terminate = True

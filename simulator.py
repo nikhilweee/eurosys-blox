@@ -21,6 +21,7 @@ from blox.deployment.grpc_stubs import rm_pb2
 from blox.deployment.grpc_stubs import rm_pb2_grpc
 from blox.deployment.grpc_stubs import simulator_pb2
 from blox.deployment.grpc_stubs import simulator_pb2_grpc
+from blox.utils import get_experiment_filepath
 import traceback
 
 
@@ -119,7 +120,7 @@ class SimulatorRunner(simulator_pb2_grpc.SimServerServicer):
             job_config_send = rm_pb2.JsonResponse()
             job_config_send.response = json.dumps(job_config)
             # self.setup_cluster()
-            # self._plot_graphs()
+            self._plot_graphs()
             return job_config_send
 
     def GetJobs(self, request, context) -> rm_pb2.JsonResponse:
@@ -183,22 +184,28 @@ class SimulatorRunner(simulator_pb2_grpc.SimServerServicer):
         """
         Post Simulation Plot Graphs
         """
-        # print("plot called")
         jct_dict = defaultdict(dict)
-        file_names_job_stats = list()
-        file_names_cluster_stats = list()
+        plot_base_dir = "./plots"
+        os.makedirs(plot_base_dir, exist_ok=True)
+        clean_prefix = os.path.basename(self.exp_prefix)
+        acceptance_policy = self.acceptance_policies[0]
 
         for scheduler in self.schedulers:
-            file_names_job_stats = list()
-            file_names_cluster_stats = list()
             for load in self.list_jobs_per_hour:
-                stat_fname = f"{self.exp_prefix}_{self.job_ids_to_track[0]}_{self.job_ids_to_track[1]}_{scheduler}_load_{load}_job_stats.json"
-                print(stat_fname)
+                stat_fname = get_experiment_filepath(
+                    self.exp_prefix,
+                    self.job_ids_to_track[0],
+                    self.job_ids_to_track[1],
+                    scheduler,
+                    load,
+                    "job_stats",
+                    acceptance_policy=acceptance_policy,
+                )
+                print(f"Reading job stats: {stat_fname}")
                 with open(stat_fname, "r") as fin:
                     data_job = json.load(fin)
-                print(scheduler, load)
                 jct_dict[scheduler][load] = self._get_avg_jct(data_job)
-                # print("Wrote to dict")
+
         fig, ax1 = plt.subplots(1, 1)
         fig.set_size_inches(10, 3)
         matplotlib.rcParams["pdf.fonttype"] = 42
@@ -206,20 +213,32 @@ class SimulatorRunner(simulator_pb2_grpc.SimServerServicer):
         print("Job completion dict {}".format(jct_dict))
         for scheduler in self.schedulers:
             plot_list = list()
-            # x_labels = list()
             for load in self.list_jobs_per_hour:
                 plot_list.append(jct_dict[scheduler][load])
             ax1.plot(self.list_jobs_per_hour, plot_list, label=scheduler)
 
         ax1.legend()
         ax1.set_title("Average JCT")
-        plt.savefig("jct.pdf", format="pdf", dpi=600, bbox_inches="tight")
+        plt.savefig(
+            os.path.join(plot_base_dir, f"{clean_prefix}_jct.pdf"),
+            format="pdf",
+            dpi=600,
+            bbox_inches="tight",
+        )
+        plt.close(fig)
 
         # plot cdf
-
         for scheduler in self.schedulers:
             for load in self.list_jobs_per_hour:
-                stat_fname = f"{self.exp_prefix}_{self.job_ids_to_track[0]}_{self.job_ids_to_track[1]}_{scheduler}_load_{load}_job_stats.json"
+                stat_fname = get_experiment_filepath(
+                    self.exp_prefix,
+                    self.job_ids_to_track[0],
+                    self.job_ids_to_track[1],
+                    scheduler,
+                    load,
+                    "job_stats",
+                    acceptance_policy=acceptance_policy,
+                )
                 with open(stat_fname, "r") as fin:
                     data_job = json.load(fin)
                 vals = data_job.values()
@@ -228,9 +247,11 @@ class SimulatorRunner(simulator_pb2_grpc.SimServerServicer):
                 plot_y_val = list()
                 for idx, val in enumerate(vals):
                     plot_y_val.append(float(idx) / len(vals))
-                write_folder = f"./plots/{self.exp_prefix}_{self.job_ids_to_track[0]}_{self.job_ids_to_track[1]}_{scheduler}_load_{load}"
+                write_folder = os.path.join(
+                    plot_base_dir,
+                    f"{clean_prefix}_{self.job_ids_to_track[0]}_{self.job_ids_to_track[1]}_{scheduler}_load_{load}",
+                )
                 if not os.path.exists(write_folder):
-
                     os.makedirs(write_folder)
                 fig, ax1 = plt.subplots(1, 1)
                 fig.set_size_inches(10, 3)
@@ -243,12 +264,20 @@ class SimulatorRunner(simulator_pb2_grpc.SimServerServicer):
                     dpi=600,
                     bbox_inches="tight",
                 )
+                plt.close(fig)
 
         # plot GPU demand
-
         for scheduler in self.schedulers:
             for load in self.list_jobs_per_hour:
-                stat_fname = f"{self.exp_prefix}_{self.job_ids_to_track[0]}_{self.job_ids_to_track[1]}_{scheduler}_load_{load}_cluster_stats.json"
+                stat_fname = get_experiment_filepath(
+                    self.exp_prefix,
+                    self.job_ids_to_track[0],
+                    self.job_ids_to_track[1],
+                    scheduler,
+                    load,
+                    "cluster_stats",
+                    acceptance_policy=acceptance_policy,
+                )
                 with open(stat_fname, "r") as fin:
                     data_job = json.load(fin)
                 gpu_demand = list()
@@ -262,9 +291,11 @@ class SimulatorRunner(simulator_pb2_grpc.SimServerServicer):
                 ax1.set_xscale("log")
                 ax1.plot(data_job.keys(), gpu_demand)
 
-                write_folder = f"./plots/{self.exp_prefix}_{self.job_ids_to_track[0]}_{self.job_ids_to_track[1]}_{scheduler}_load_{load}"
+                write_folder = os.path.join(
+                    plot_base_dir,
+                    f"{clean_prefix}_{self.job_ids_to_track[0]}_{self.job_ids_to_track[1]}_{scheduler}_load_{load}",
+                )
                 if not os.path.exists(write_folder):
-
                     os.makedirs(write_folder)
                 plt.savefig(
                     os.path.join(
@@ -274,17 +305,20 @@ class SimulatorRunner(simulator_pb2_grpc.SimServerServicer):
                     dpi=600,
                     bbox_inches="tight",
                 )
+                plt.close(fig)
+
                 # plot free GPUs
                 fig, ax1 = plt.subplots(1, 1)
                 fig.set_size_inches(10, 3)
                 ax1.set_title(f"{scheduler}_load_{load}_free_GPUs")
-                ax1.plot(data_job.keys(), free_gpu)
+                ax1.plot(data_job.keys(), free_gpus)
                 plt.savefig(
                     os.path.join(write_folder, f"{scheduler}_load_{load}_free_gpu.pdf"),
                     format="pdf",
                     dpi=600,
                     bbox_inches="tight",
                 )
+                plt.close(fig)
 
     def _clean_sim_job(self, new_job: dict) -> dict:
         """

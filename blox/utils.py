@@ -1,11 +1,34 @@
+from __future__ import annotations
+
 import copy
+import os
 import json
 import pandas as pd
-from blox_manager import BloxManager
-from cluster_state import ClusterState
-from job_state import JobState
+from typing import TYPE_CHECKING, Tuple, List
 
-from typing import Tuple, List
+if TYPE_CHECKING:
+    from .blox_manager import BloxManager
+    from .cluster_state import ClusterState
+    from .job_state import JobState
+
+
+def get_experiment_filepath(
+    exp_prefix: str,
+    start_id: int,
+    stop_id: int,
+    scheduler: str,
+    load: float,
+    metric_type: str,
+    acceptance_policy: str,
+) -> str:
+    """Build the stats path without filesystem changes; writers create its directory."""
+    dirname = os.path.dirname(exp_prefix) or "experiments"
+    prefix = os.path.basename(exp_prefix)
+    filename = (
+        f"{prefix}_{start_id}_{stop_id}_{scheduler}_{acceptance_policy}"
+        f"_load_{load:g}_{metric_type}.json"
+    )
+    return os.path.join(dirname, filename)
 
 
 def get_metrics(
@@ -220,38 +243,66 @@ def track_finished_jobs(
         )
     )
     if all(jid in job_state.finished_job for jid in job_state.job_ids_to_track):
-        with open(
-            f"{blr.exp_prefix}_{job_state.job_ids_to_track[0]}_{job_state.job_ids_to_track[-1]}_{blr.scheduler_name}_load_{blr.load}_job_stats.json",
-            "w",
-        ) as fopen:
-            # fopen.write(json.dumps(self.job_completion_stats))
+        acceptance_policy = blr.acceptance_policy
+        job_stats_path = get_experiment_filepath(
+            blr.exp_prefix,
+            job_state.job_ids_to_track[0],
+            job_state.job_ids_to_track[-1],
+            blr.scheduler_name,
+            blr.load,
+            "job_stats",
+            acceptance_policy=acceptance_policy,
+        )
+        os.makedirs(os.path.dirname(job_stats_path), exist_ok=True)
+        with open(job_stats_path, "w") as fopen:
             json.dump(job_state.job_completion_stats, fopen)
 
-        with open(
-            f"{blr.exp_prefix}_{job_state.job_ids_to_track[0]}_{job_state.job_ids_to_track[-1]}_{blr.scheduler_name}_load_{blr.load}_cluster_stats.json",
-            "w",
-        ) as fopen:
-            # fopen.write(json.dumps(self.cluster_stats))
+        cluster_stats_path = get_experiment_filepath(
+            blr.exp_prefix,
+            job_state.job_ids_to_track[0],
+            job_state.job_ids_to_track[-1],
+            blr.scheduler_name,
+            blr.load,
+            "cluster_stats",
+            acceptance_policy=acceptance_policy,
+        )
+        with open(cluster_stats_path, "w") as fopen:
             json.dump(cluster_state.cluster_stats, fopen)
-        # sys.exit(0)
-        with open(
-            f"{blr.exp_prefix}_{job_state.job_ids_to_track[0]}_{job_state.job_ids_to_track[-1]}_{blr.scheduler_name}_load_{blr.load}_run_time_stats.json",
-            "w",
-        ) as fopen:
-            # fopen.write(json.dumps(self.cluster_stats))
+
+        runtime_stats_path = get_experiment_filepath(
+            blr.exp_prefix,
+            job_state.job_ids_to_track[0],
+            job_state.job_ids_to_track[-1],
+            blr.scheduler_name,
+            blr.load,
+            "run_time_stats",
+            acceptance_policy=acceptance_policy,
+        )
+        with open(runtime_stats_path, "w") as fopen:
             json.dump(job_state.job_runtime_stats, fopen)
 
-        with open(
-            f"{blr.exp_prefix}_{job_state.job_ids_to_track[0]}_{job_state.job_ids_to_track[-1]}_{blr.scheduler_name}_load_{blr.load}_responsivness.json",
-            "w",
-        ) as fopen:
-            # fopen.write(json.dumps(self.cluster_stats))
+        responsiveness_path = get_experiment_filepath(
+            blr.exp_prefix,
+            job_state.job_ids_to_track[0],
+            job_state.job_ids_to_track[-1],
+            blr.scheduler_name,
+            blr.load,
+            "responsivness",
+            acceptance_policy=acceptance_policy,
+        )
+        with open(responsiveness_path, "w") as fopen:
             json.dump(job_state.job_responsiveness_stats, fopen)
-        with open(
-            f"{blr.exp_prefix}_{job_state.job_ids_to_track[0]}_{job_state.job_ids_to_track[-1]}_{blr.scheduler_name}_load_{blr.load}_custom_metrics.json",
-            "w",
-        ) as fopen:
-            # fopen.write(json.dumps(self.cluster_stats))
+
+        custom_metrics_path = get_experiment_filepath(
+            blr.exp_prefix,
+            job_state.job_ids_to_track[0],
+            job_state.job_ids_to_track[-1],
+            blr.scheduler_name,
+            blr.load,
+            "custom_metrics",
+            acceptance_policy=acceptance_policy,
+        )
+        with open(custom_metrics_path, "w") as fopen:
             json.dump(job_state.custom_metrics, fopen)
 
         blr.terminate = True
